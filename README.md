@@ -19,7 +19,7 @@ Antes de rodar o projeto, você precisa ter:
 
 3. **Bibliotecas necessárias** instaladas:
    ```bash
-   pip install requests pandas matplotlib
+   pip install requests pandas python-dateutil
 
 ## 🚀 Como executar
 
@@ -28,32 +28,13 @@ Antes de rodar o projeto, você precisa ter:
 Execute o script de coleta para buscar os repositórios mais populares e salvar em CSV:
 
 ```
-python lab01_sprint1.py
+python lab03_sprint1.py
 ```
 
 Isso vai gerar o arquivo:
 
-lab01_data.csv → Contém os dados coletados (nome, URL, linguagem, PRs, releases, issues etc.)
+ados_pull_requests_analise.csv → Contém os dados coletados
 
-## 2. Analisar os dados e gerar gráficos
-
-Para visualizar e analisar os dados coletados, execute:
-
-```
-python analise_graficos.py
-```
-
-Esse script gera gráficos interativos, como:
-
-Distribuição da idade dos repositórios
-Pull requests aceitas por linguagem
-Frequência de releases
-Dias desde a última atualização
-Linguagens mais utilizadas
-Percentual de issues fechadas
-Correlação entre métricas
-
-📌 Os gráficos serão exibidos diretamente na tela.
 
 
 
