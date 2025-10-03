@@ -1,6 +1,6 @@
 # Projeto: Coleta e Análise de Repositórios Populares do GitHub (GraphQL API)
 
-Este projeto utiliza a **API GraphQL do GitHub** para coletar informações sobre os repositórios mais populares, armazenando os dados em um arquivo `lab01_data.csv` e permitindo análises através de gráficos.
+Este projeto utiliza a **API GraphQL do GitHub** para coletar informações sobre os repositórios mais populares, armazenando os dados em um arquivo `ados_pull_requests_analise.csv` e permitindo análises através de gráficos.
 
 ---
 
