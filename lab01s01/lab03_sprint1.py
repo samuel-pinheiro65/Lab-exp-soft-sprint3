@@ -92,7 +92,7 @@ def buscar_repositorios_elegiveis(total_repos=200, min_prs=100):
                     "owner": repo["owner"]["login"],
                     "name": repo["name"]
                 })
-                print(f"  [+] Repositório elegível encontrado: {repo['owner']['login']}/{repo['name']} ({len(repositorios_elegiveis)}/{total_repos})")
+                print(f"  [+] Repositório elegível encontrado: {repo['owner']['login']}/{repo['name']} - PRs: {repo['pullRequests']['totalCount']} ({len(repositorios_elegiveis)}/{total_repos})")
                 if len(repositorios_elegiveis) >= total_repos:
                     break
         
@@ -108,9 +108,13 @@ def buscar_repositorios_elegiveis(total_repos=200, min_prs=100):
 
 # --- FASE 2: COLETAR DADOS DOS PULL REQUESTS ---
 
-def coletar_dados_pull_requests(repositorios):
+# <<< ALTERAÇÃO 1: Parâmetro renomeado para refletir o limite por repositório >>>
+def coletar_dados_pull_requests(repositorios, max_prs_por_repositorio=None):
     """Coleta e filtra Pull Requests dos repositórios fornecidos."""
     print("\n🔎 Iniciando a coleta de dados de Pull Requests...")
+    if max_prs_por_repositorio:
+        print(f"   -- Limite máximo de {max_prs_por_repositorio} PRs por repositório --")
+    
     dados_prs = []
 
     query_pr = """
@@ -133,7 +137,7 @@ def coletar_dados_pull_requests(repositorios):
             # Tamanho
             additions
             deletions
-            files(first: 1) { totalCount } # Otimização para pegar apenas a contagem
+            files(first: 1) { totalCount }
 
             # Descrição
             bodyText
@@ -155,6 +159,9 @@ def coletar_dados_pull_requests(repositorios):
         print(f"\n--- Processando Repositório {i + 1}/{len(repositorios)}: {owner}/{name} ---")
         cursor = None
         
+        # <<< ALTERAÇÃO 2: Contador de PRs é inicializado aqui, para cada repositório >>>
+        prs_coletados_neste_repo = 0
+        
         while True:
             variables = {"owner": owner, "name": name, "cursor": cursor}
             data = run_query(query_pr, variables)
@@ -167,12 +174,9 @@ def coletar_dados_pull_requests(repositorios):
             
             for pr in prs["nodes"]:
                 # --- APLICANDO FILTROS DE ELEGIBILIDADE ---
-                
-                # 1. Deve ter pelo menos uma revisão
                 if pr["reviews"]["totalCount"] < 1:
                     continue
 
-                # 2. Revisão deve ter levado pelo menos uma hora
                 created_at = parse_datetime(pr["createdAt"])
                 final_date = parse_datetime(pr["mergedAt"] or pr["closedAt"])
                 
@@ -180,7 +184,7 @@ def coletar_dados_pull_requests(repositorios):
                     continue
                     
                 tempo_analise_delta = final_date - created_at
-                if tempo_analise_delta.total_seconds() < 3600: # 3600 segundos = 1 hora
+                if tempo_analise_delta.total_seconds() < 3600:
                     continue
                     
                 # --- SE PASSOU NOS FILTROS, EXTRAIR MÉTRICAS ---
@@ -196,14 +200,25 @@ def coletar_dados_pull_requests(repositorios):
                     "interacoes_comentarios": pr["comments"]["totalCount"],
                     "numero_revisoes": pr["reviews"]["totalCount"]
                 })
-            
-            print(f"  ... PRs elegíveis coletados até agora: {len(dados_prs)}")
+                
+                # <<< ALTERAÇÃO 3: Incrementa o contador específico do repositório >>>
+                prs_coletados_neste_repo += 1
+                
+                # Se o limite para este repositório foi atingido, sai do loop de PRs da página atual
+                if max_prs_por_repositorio is not None and prs_coletados_neste_repo >= max_prs_por_repositorio:
+                    break
 
-            if not prs["pageInfo"]["hasNextPage"]:
-                break
+            print(f"  ... PRs elegíveis coletados no total: {len(dados_prs)}")
+
+            # <<< ALTERAÇÃO 4: Verifica se o limite do repositório foi atingido para parar a paginação >>>
+            if (max_prs_por_repositorio is not None and prs_coletados_neste_repo >= max_prs_por_repositorio) or not prs["pageInfo"]["hasNextPage"]:
+                if max_prs_por_repositorio is not None and prs_coletados_neste_repo >= max_prs_por_repositorio:
+                    print(f"  ✨ Limite de {prs_coletados_neste_repo} PRs atingido para este repositório.")
+                break # Sai do loop 'while True' e passa para o próximo repositório
+            
             cursor = prs["pageInfo"]["endCursor"]
 
-    print(f"\n✅ Fase 2 concluída: Coleta finalizada com {len(dados_prs)} Pull Requests elegíveis.")
+    print(f"\n✅ Fase 2 concluída: Coleta finalizada com {len(dados_prs)} Pull Requests elegíveis no total.")
     return dados_prs
 
 # --- EXECUÇÃO PRINCIPAL ---
@@ -214,14 +229,20 @@ if __name__ == "__main__":
     
     if repositorios_selecionados:
         # FASE 2
-        dados_finais = coletar_dados_pull_requests(repositorios_selecionados)
+        # <<< ALTERAÇÃO 5: Define o limite máximo de PRs a serem coletados de CADA repositório. >>>
+        # Altere o número ou defina como None para coletar todos os PRs elegíveis.
+        LIMITE_POR_REPOSITORIO = 50 
+        dados_finais = coletar_dados_pull_requests(
+            repositorios_selecionados, 
+            max_prs_por_repositorio=LIMITE_POR_REPOSITORIO
+        )
         
         if dados_finais:
             df = pd.DataFrame(dados_finais)
             # Salvando os dados em um arquivo CSV
             nome_arquivo = "dados_pull_requests_analise.csv"
             df.to_csv(nome_arquivo, index=False, encoding="utf-8")
-            print(f"\n🎉 Sucesso! Os dados foram salvos em '{nome_arquivo}'.")
+            print(f"\n🎉 Sucesso! Os dados foram salvos em '{nome_arquivo}'. Total de PRs coletados: {len(df)}")
         else:
             print("\n⚠️ Nenhum Pull Request elegível foi encontrado após a filtragem.")
     else:
